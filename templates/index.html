@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartPark - Real-Time System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+
+<body class="min-h-screen flex flex-col antialiased bg-slate-900">
+
+    <!-- Navbar -->
+    <nav class="fixed top-0 w-full z-50 bg-slate-900/80 backdrop-blur-md border-b border-white/5">
+        <div class="max-w-md mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-2 cursor-pointer" onclick="goHome()">
+                <div
+                    class="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-blue-500 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
+                    </svg>
+                </div>
+                <span class="font-bold text-lg">Smart<span class="text-emerald-400">Park</span></span>
+            </div>
+            <button id="logoutBtn" class="hidden text-sm text-slate-400 hover:text-white">Logout</button>
+        </div>
+    </nav>
+
+    <!-- Main App -->
+    <main class="flex-grow pt-20 pb-8 px-4 w-full max-w-md mx-auto relative">
+        <div id="connectionStatus" class="absolute top-20 right-4 w-3 h-3 rounded-full bg-red-500 animate-pulse"
+            title="Disconnected"></div>
+        <div id="app"></div>
+    </main>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        // --- State ---
+        let cardsData = {};
+        const AUTH_KEY = 'smartpark_auth';
+        let isPolling = false;
+
+        // --- API Calls ---
+        async function fetchStatus() {
+            try {
+                const res = await fetch('/api/status');
+                if (!res.ok) throw new Error('Network err');
+                cardsData = await res.json();
+
+                // Update Sync Indicator
+                document.getElementById('connectionStatus').className = "absolute top-20 right-4 w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]";
+
+                // Refresh UI if needed (Naive Reactivity)
+                // In a real app we'd diff, but here we'll just check if we are on Dashboard to update live
+                const urlParams = new URLSearchParams(window.location.search);
+                if (isLoggedIn() && !urlParams.get('card')) {
+                    renderManagerDashboard(document.getElementById('app'));
+                }
+            } catch (e) {
+                console.error("Sync Error", e);
+                document.getElementById('connectionStatus').className = "absolute top-20 right-4 w-3 h-3 rounded-full bg-red-500 animate-pulse";
+            }
+        }
+
+        async function updateCard(cardId, action, payload = {}) {
+            try {
+                const res = await fetch('/api/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cardId, action, ...payload })
+                });
+                const data = await res.json();
+                if (data.error) alert(data.error);
+                else {
+                    await fetchStatus(); // Force immediate refresh
+                    alert(data.message);
+                    goHome();
+                }
+            } catch (e) {
+                alert("Operation failed. Check connection.");
+            }
+        }
+
+        // --- Routing & Rendering ---
+
+        function init() {
+            // Start Polling (Real-Time Sync)
+            fetchStatus();
+            setInterval(fetchStatus, 2000); // Poll every 2 seconds
+
+            render();
+            checkAuth();
+        }
+
+        function isLoggedIn() { return sessionStorage.getItem(AUTH_KEY) === 'true'; }
+
+        function checkAuth() {
+            const btn = document.getElementById('logoutBtn');
+            if (isLoggedIn()) {
+                btn.classList.remove('hidden');
+                btn.onclick = () => { sessionStorage.removeItem(AUTH_KEY); window.location.reload(); };
+            } else {
+                btn.classList.add('hidden');
+            }
+        }
+
+        function goHome() {
+            window.location.search = "";
+        }
+
+        function render() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const cardId = urlParams.get('card');
+            const app = document.getElementById('app');
+
+            if (cardId) {
+                if (isLoggedIn()) renderManagerScan(app, cardId); // Manager Scan
+                else renderPublicScan(app, cardId); // Public Scan
+            } else {
+                if (isLoggedIn()) renderManagerDashboard(app);
+                else renderLogin(app);
+            }
+        }
+
+        // --- Views ---
+
+        function renderLogin(container) {
+            container.innerHTML = `
+                <div class="mt-10 animate-fade-in text-center">
+                    <h1 class="text-3xl font-bold mb-8">Admin Login</h1>
+                    <form onsubmit="handleLogin(event)" class="glass p-8 rounded-2xl flex flex-col gap-4 text-left">
+                        <div>
+                            <label class="text-xs font-bold text-slate-500 uppercase">Username</label>
+                            <input type="text" id="username" class="w-full bg-slate-800 border-slate-700 rounded-lg p-3 text-white focus:border-emerald-500 outline-none mt-1" placeholder="">
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-slate-500 uppercase">Password</label>
+                            <input type="password" id="password" class="w-full bg-slate-800 border-slate-700 rounded-lg p-3 text-white focus:border-emerald-500 outline-none mt-1" placeholder="">
+                        </div>
+                        <button type="submit" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-lg mt-2 transition-all">Login</button>
+                    </form>
+                    
+                    <div class="mt-12 pt-8 border-t border-slate-800">
+                        <p class="text-xs font-bold text-slate-500 uppercase mb-4">Simulate Scans (Public)</p>
+                        <div class="grid gap-3">
+                            ${[1, 2, 3].map(id => `
+                                <a href="?card=${id}" target="_blank" class="flex items-center justify-between p-3 rounded-xl bg-slate-800/50 hover:bg-slate-800 border border-slate-700">
+                                    <span class="font-bold text-slate-300">Card #${id}</span>
+                                    <span class="text-xs text-emerald-400">Scan &rarr;</span>
+                                </a>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function handleLogin(e) {
+            e.preventDefault();
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            if (u === 'admin' && p === '123') {
+                sessionStorage.setItem(AUTH_KEY, 'true');
+                window.location.reload();
+            } else {
+                alert('Invalid! Use admin / 123');
+            }
+        }
+
+        function renderManagerDashboard(container) {
+            // NOTE: This view is refreshed by the interval to show live status
+            let html = `<h2 class="text-xl font-bold mb-6 flex items-center justify-between">Dashboard <span class="text-xs font-light bg-slate-800 px-2 py-1 rounded">LIVE</span></h2><div class="grid gap-4">`;
+
+            // If cardsData is empty (first load), show loader or existing state
+            const ids = [1, 2, 3];
+            ids.forEach(id => {
+                const card = cardsData[id.toString()] || { id: id, status: 'unknown' }; // Handle str keys from JSON
+                const isOcc = card.status === 'occupied';
+
+                html += `
+                    <div class="glass p-5 rounded-2xl flex flex-col gap-3 relative overflow-hidden">
+                        <div class="flex justify-between items-center">
+                            <span class="text-lg font-bold text-white">Card #${id}</span>
+                            <span class="px-2 py-1 rounded-md text-[10px] font-bold uppercase ${isOcc ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'}">
+                                ${card.status === 'unknown' ? 'LOADING...' : (isOcc ? 'OCCUPIED' : 'EMPTY')}
+                            </span>
+                        </div>
+                        ${isOcc ? `
+                            <div class="text-sm text-slate-400">
+                                <p>Vehicle: <span class="text-white font-mono">${card.vehicle}</span></p>
+                                <p>Time: <span class="text-slate-500">${new Date(card.entryTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></p>
+                            </div>
+                        ` : '<div class="h-10"></div>'}
+                        <button onclick="window.location.search='?card=${id}'" class="w-full py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-sm font-medium transition-colors">
+                            ${isOcc ? 'Manage Exit' : 'Check In Vehicle'}
+                        </button>
+                    </div>
+                `;
+            });
+            html += `</div>`;
+            container.innerHTML = html;
+        }
+
+        function renderManagerScan(container, cardId) {
+            // Need latest data to decide what to show
+            const card = cardsData[cardId];
+            if (!card) return container.innerHTML = "<div class='text-center mt-10'>Loading Card Data...</div>";
+
+            if (card.status === 'empty') {
+                container.innerHTML = `
+                    <div class="mt-4 animate-slide-up">
+                        <button onclick="goHome()" class="mb-4 text-sm text-slate-400">&larr; Back</button>
+                        <div class="glass p-6 rounded-2xl border-t-4 border-t-emerald-500">
+                            <h1 class="text-2xl font-bold mb-6">Check-In: Card #${cardId}</h1>
+                            <input id="vIn" type="text" class="w-full bg-slate-800 border-slate-700 rounded-xl p-4 mb-3 text-lg font-mono uppercase text-white placeholder-slate-500" placeholder="Vehicle No (KA-01...)">
+                            <input id="pIn" type="tel" class="w-full bg-slate-800 border-slate-700 rounded-xl p-4 mb-6 text-lg text-white placeholder-slate-500" placeholder="Phone Number">
+                            <button onclick="handleCheckIn(${cardId})" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-emerald-500/20">Confirm Entry</button>
+                        </div>
+                    </div>
+                `;
+            } else {
+                // Exit
+                const diff = Math.round((new Date() - new Date(card.entryTime)) / 60000);
+                container.innerHTML = `
+                    <div class="mt-4 animate-slide-up">
+                        <button onclick="goHome()" class="mb-4 text-sm text-slate-400">&larr; Back</button>
+                        <div class="glass p-6 rounded-2xl border-t-4 border-t-red-500">
+                            <h1 class="text-2xl font-bold mb-2">Check-Out: Card #${cardId}</h1>
+                            <div class="bg-slate-800/50 p-4 rounded-xl mb-6 space-y-2">
+                                <p class="text-slate-400 text-sm">Vehicle: <span class="text-white font-mono text-lg">${card.vehicle}</span></p>
+                                <p class="text-slate-400 text-sm">Duration: <span class="text-emerald-400 font-mono">${diff} mins</span></p>
+                                <p class="text-slate-400 text-sm">Bill: <span class="text-white font-bold text-xl">₹50</span></p>
+                            </div>
+                            <button onclick="handleCheckOut(${cardId})" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-red-500/20">Mark Paid & Exit</button>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function handleCheckIn(id) {
+            const v = document.getElementById('vIn').value;
+            const p = document.getElementById('pIn').value;
+            if (!v) return alert("Vehicle No Required");
+            updateCard(id, 'checkin', { vehicle: v, phone: p });
+        }
+
+        function handleCheckOut(id) {
+            if (confirm("Confirm Payment Received?")) {
+                updateCard(id, 'checkout');
+            }
+        }
+
+        function renderPublicScan(container, cardId) {
+            const card = cardsData[cardId];
+            if (!card) return container.innerHTML = "<div class='text-center mt-10'>Loading...</div>";
+
+            if (card.status === 'empty') {
+                container.innerHTML = `
+                    <div class="text-center mt-20 p-6">
+                        <h2 class="text-xl font-bold text-slate-500">Tag Inactive</h2>
+                        <p class="text-slate-600 mt-2">This spot is currently empty.</p>
+                        <a href="/" class="block mt-8 text-emerald-500">Admin Login</a>
+                    </div>
+                `;
+            } else {
+                container.innerHTML = `
+                    <div class="mt-10 animate-fade-in text-center px-4">
+                        <div class="inline-block p-4 rounded-full bg-red-500/10 text-red-500 mb-4 animate-pulse">
+                            <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                        </div>
+                        <h1 class="text-2xl font-bold text-white mb-2">Vehicle Blocking?</h1>
+                        <div class="bg-slate-800 p-6 rounded-2xl mb-6 mt-6 border border-slate-700">
+                             <p class="text-xs uppercase text-slate-500 font-bold mb-1">Vehicle Number</p>
+                             <div class="text-3xl font-mono font-bold tracking-wider">${card.vehicle}</div>
+                        </div>
+                        <button onclick="alert('Calls handled by backend masking...')" class="w-full bg-white text-slate-900 font-bold py-4 rounded-xl shadow-xl flex items-center justify-center gap-2">
+                             📞 Call Owner (Anonymous)
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        // Start
+        window.onload = init;
+    </script>
+</body>
+
+</html>
