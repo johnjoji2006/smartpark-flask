@@ -317,9 +317,9 @@
                              <p class="text-xs uppercase text-slate-500 font-bold mb-1">Vehicle Number</p>
                              <div class="text-3xl font-mono font-bold tracking-wider">${card.vehicle}</div>
                         </div>
-                        <button onclick="alert('Calls handled by backend masking...')" class="w-full bg-white text-slate-900 font-bold py-4 rounded-xl shadow-xl flex items-center justify-center gap-2">
+                        <a href="tel:${card.phone}" class="w-full bg-white text-slate-900 font-bold py-4 rounded-xl shadow-xl flex items-center justify-center gap-2">
                              📞 Call Owner (Anonymous)
-                        </button>
+                        </a>
                         <button onclick="navigateHome()" class="block mt-8 text-slate-500 mx-auto text-sm hover:text-white">Back to Login</button>
                     </div>
                 `;
