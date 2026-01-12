@@ -88,11 +88,8 @@ HTML_TEMPLATE = """
                 <span class="font-bold text-xl tracking-tight text-white">SmartPark</span>
             </div>
             <div class="flex items-center gap-4">
-                 <div class="flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800 border border-slate-700">
-                    <div id="connectionStatus" class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
-                    <span class="text-xs font-medium text-slate-300 uppercase tracking-wider">System</span>
-                 </div>
-                 <button id="logoutBtn" class="hidden text-sm font-medium text-slate-300 hover:text-white transition-colors">Log Out</button>
+                 <div id="connectionStatus" class="w-2 h-2 rounded-full bg-red-500 animate-pulse" title="System Status"></div>
+                 <button id="logoutBtn" class="hidden text-xs font-bold bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg border border-slate-700 transition-colors text-white uppercase tracking-wider">Log Out</button>
             </div>
         </div>
     </nav>
@@ -129,7 +126,7 @@ HTML_TEMPLATE = """
                 const newCardsData = await res.json();
 
                 const statusEl = document.getElementById('connectionStatus');
-                statusEl.className = "w-2 h-2 rounded-full bg-emerald-500 transition-colors duration-300";
+                statusEl.className = "w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)] transition-colors duration-300";
                 
                 // Deep compare to prevent stutter
                 if (JSON.stringify(cardsData) !== JSON.stringify(newCardsData)) {
@@ -232,15 +229,18 @@ HTML_TEMPLATE = """
                             The enterprise-grade solution for vehicle management. Secure, fast, and built for scale.
                         </p>
                         
-                        <div class="flex justify-center gap-4">
-                            <button onclick="navigateToLogin()" class="bg-slate-900 hover:bg-black text-white px-8 py-3.5 rounded-lg font-semibold shadow-sm transition-all text-sm flex items-center gap-2">
+                        <div class="flex flex-col items-center gap-6">
+                            <button onclick="navigateToLogin()" class="w-full max-w-xs bg-slate-900 hover:bg-black text-white px-8 py-4 rounded-xl font-bold shadow-lg shadow-slate-900/10 transition-all text-sm flex items-center justify-center gap-2 transform hover:-translate-y-1">
                                 Access Console <i class="ph-bold ph-arrow-right"></i>
                             </button>
-                            <div class="flex items-center gap-2 bg-white px-4 py-3.5 rounded-lg border border-slate-200 shadow-sm">
-                                <span class="text-xs font-bold text-slate-400 uppercase mr-2">Public Sim</span>
-                                ${[1, 2, 3].map(id => `
-                                    <button onclick="navigateToCard(${id})" class="text-slate-500 hover:text-indigo-600 font-bold text-sm px-2 transition-colors">${id}</button>
-                                `).join('<span class="text-slate-200">|</span>')}
+                            
+                            <div class="flex items-center gap-0 divide-x divide-slate-100 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm">
+                                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3">Public Sim</span>
+                                <div class="flex items-center px-1">
+                                    ${[1, 2, 3].map(id => `
+                                        <button onclick="navigateToCard(${id})" class="text-slate-500 hover:text-indigo-600 hover:bg-slate-50 font-bold text-sm w-8 h-8 rounded-lg transition-colors flex items-center justify-center">${id}</button>
+                                    `).join('')}
+                                </div>
                             </div>
                         </div>
                     </div>
